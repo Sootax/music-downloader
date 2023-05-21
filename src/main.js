@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const async = require('async');
 const ytdl = require('ytdl-core');
@@ -178,3 +178,7 @@ ipcMain.on('selectPath', async (event) => {
     savePath(newPath);
   }
 });
+
+ipcMain.on('openGithub', (event) => {
+  shell.openExternal('https://github.com/Sootax/music-downloader');
+})

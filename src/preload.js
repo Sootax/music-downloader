@@ -4,7 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   send: (channel, data) => {
-    const validChannels = ['download', 'getPath', 'savePath', 'selectPath'];
+    const validChannels = ['download', 'getPath', 'savePath', 'selectPath', 'openGithub'];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, data);
     }

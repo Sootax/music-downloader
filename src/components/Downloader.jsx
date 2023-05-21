@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import DownloadIcon from '@mui/icons-material/Download';
 import CheckIcon from '@mui/icons-material/Check';
-import { ThemeProvider, createTheme, TextField, Button, Box, LinearProgress } from '@mui/material';
+import { ThemeProvider, createTheme, TextField, Button, Box, LinearProgress, IconButton } from '@mui/material';
+import SettingsIcon from '@mui/icons-material/Settings';
 import LoadingButton from '@mui/lab/LoadingButton';
 
-export default function Downloader() {
+export default function Downloader({ handleRotate, flipFinished }) {
   const [downloading, setDownloading] = useState(false);
   const downloadUrlRef = useRef(null);
 
@@ -92,9 +93,18 @@ export default function Downloader() {
     return [hasMatches, matches];
   };
 
+  if (flipFinished) {
+    return (
+      <div className='bg-gray-800 h-[400px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl shadow-md shadow-gray-950/50 relative'></div>
+    )
+  }
+
   return (
     <ThemeProvider theme={defaultTheme}>
-      <div className='bg-gray-800 h-[400px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl shadow-md shadow-gray-950 relative'>
+      <div className='bg-gray-800 h-[400px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl shadow-md shadow-gray-950/50 relative'>
+        <div className='absolute right-2 top-2'>
+          <IconButton onClick={handleRotate}><SettingsIcon/></IconButton>
+        </div>
         <h1 className='text-center text-3xl p-5'>Songify</h1>
         <div className='flex flex-col items-center mb-6'>
           <TextField
@@ -173,4 +183,13 @@ const defaultTheme = createTheme({
     },
     mode: 'dark',
   },
+  overries: {
+    SettingsIcon: {
+      root: {
+        '&:hover': {
+          backgroundColor: 'primary',
+        }
+      }
+    }
+  }
 });
