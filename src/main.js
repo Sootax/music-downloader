@@ -7,8 +7,7 @@ const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const { SoundCloud } = require('scdl-core');
-const { getPath, savePath } = require('./settings');
-const { getBounds, saveBounds } = require('./settings');
+const { getPath, savePath, getBounds, saveBounds, getSettings, saveSettings } = require('./settings');
 
 require('dotenv').config();
 
@@ -72,6 +71,7 @@ app.on('activate', () => {
 
 ipcMain.on('download', async (event, downloadObject) => {
   const path = getPath();
+  const settings = getSettings();
   let completedDownloads = 0;
   let totalSongs = 0;
 
@@ -98,12 +98,23 @@ ipcMain.on('download', async (event, downloadObject) => {
     const songs = results.items.map((result) => ({
       title: result.title,
       url: result.shortUrl,
+      thumbnail: result.bestThumbnail.url,
     }));
+    event.reply('getSongs', songs);
     totalSongs = songs.length;
 
-    async.eachLimit(songs, 10, async (song) => {
-      await downloadYoutubeSong(song, path, progressCallback, true);
-    });
+    if (settings.batchSize > 1) {
+      async.eachLimit(songs, settings.batchSize, async (song) => {
+        event.reply('getCurrentSong', song)
+        await downloadYoutubeSong(song, path, progressCallback, true);
+      });
+    } else {
+      async.eachLimit(songs, 1, async (song) => {
+        console.log(song.title);
+        await downloadYoutubeSong(song, path, progressCallback, true);
+      });
+    }
+    
   } else if (downloadObject.match === 'soundCloudSingular') {
     // TODO: add support for singular soundcloud songs
   } else if (downloadObject.match === 'soundCloudPlaylist') {
@@ -160,15 +171,6 @@ function filterCharacters(originalTitle) {
   return originalTitle.replace(/[/\\?%*:|"<>]/g, ' ');
 }
 
-ipcMain.on('getPath', (event) => {
-  const path = getPath();
-  event.reply('getPath', path);
-});
-
-ipcMain.on('savePath', (event, path) => {
-  savePath(path);
-});
-
 ipcMain.on('selectPath', async (event) => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory'],
@@ -178,6 +180,15 @@ ipcMain.on('selectPath', async (event) => {
     savePath(newPath);
   }
 });
+
+ipcMain.on('saveSettings', (event, settings) => {
+  saveSettings(settings);
+})
+
+ipcMain.on('getSettings', (event) => {
+  const settings = getSettings()
+  event.reply('getSettings', settings);
+})
 
 ipcMain.on('openGithub', (event) => {
   shell.openExternal('https://github.com/Sootax/music-downloader');

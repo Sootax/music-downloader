@@ -1,12 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import DownloadIcon from '@mui/icons-material/Download';
 import CheckIcon from '@mui/icons-material/Check';
-import { ThemeProvider, createTheme, TextField, Button, Box, LinearProgress, IconButton } from '@mui/material';
+import { ThemeProvider, createTheme, TextField, Button, LinearProgress, IconButton } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LoadingButton from '@mui/lab/LoadingButton';
+import ImageDisplay from './ImageDisplay.jsx';
 
 export default function Downloader({ handleRotate, flipFinished }) {
   const [downloading, setDownloading] = useState(false);
+  const [songs, setSongs] = useState([]);
+  const [currentSong, setCurrentSong] = useState(null);
+
   const downloadUrlRef = useRef(null);
 
   const [inputError, setInputError] = useState({
@@ -21,22 +25,35 @@ export default function Downloader({ handleRotate, flipFinished }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [progress, setProgress] = useState(0);
 
-  const updateProgress = () => {
+  const updateSongs = async () => {
+    window.api.receive('getSongs', (songs) => {
+      setSongs(songs);
+    });
+  };
+
+  const updateCurrentSong = async () => {
+    window.api.receive('getCurrentSong', (song) => {
+      setCurrentSong(song);
+    });
+  };
+
+  const updateProgress = async () => {
     window.api.receive('progress', (progress) => {
       setProgress(progress);
-    })
-  }
+    });
+  };
 
   useEffect(() => {
     if (progress === 100) {
       setTimeout(() => {
+        setCurrentSong(null);
         setDownloading(false);
         setDownloadSuccess(true);
         setProgress(0);
       }, 1000);
       setTimeout(() => setDownloadSuccess(false), 2000);
     }
-  }, [progress])
+  }, [progress]);
 
   const handleDownload = async () => {
     const [isValid, matches] = validate();
@@ -46,6 +63,8 @@ export default function Downloader({ handleRotate, flipFinished }) {
       setErrorMessage('');
       setDownloading(true);
       updateProgress();
+      updateSongs();
+      updateCurrentSong();
       window.api.send('download', { url: downloadUrlRef.current.value, match: match });
       window.api.receive('download', (data) => {
         if (data.error) {
@@ -96,17 +115,19 @@ export default function Downloader({ handleRotate, flipFinished }) {
   if (flipFinished) {
     return (
       <div className='bg-gray-800 h-[400px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl shadow-md shadow-gray-950/50 relative'></div>
-    )
+    );
   }
 
   return (
     <ThemeProvider theme={defaultTheme}>
-      <div className='bg-gray-800 h-[400px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl shadow-md shadow-gray-950/50 relative'>
+      <div className='bg-gray-800 h-[430px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl shadow-md shadow-gray-950/50 relative'>
         <div className='absolute right-2 top-2'>
-          <IconButton onClick={handleRotate}><SettingsIcon/></IconButton>
+          <IconButton onClick={handleRotate}>
+            <SettingsIcon />
+          </IconButton>
         </div>
         <h1 className='text-center text-3xl p-5'>Songify</h1>
-        <div className='flex flex-col items-center mb-6'>
+        <div className='flex flex-col items-center mb-2'>
           <TextField
             inputRef={downloadUrlRef}
             id='downloadUrl'
@@ -118,15 +139,6 @@ export default function Downloader({ handleRotate, flipFinished }) {
             FormHelperTextProps={{ style: { minHeight: '1.8em' } }}
             onClick={(event) => event.target.select()}
           />
-          <Button
-            variant='contained'
-            component='label'
-            sx={{ width: '100%' }}
-            onClick={() => window.api.send('selectPath')}
-          >
-            Select Path
-          </Button>
-          <Box sx={{ height: 16 }} />
           {!downloadError && !downloadSuccess && (
             <LoadingButton
               loading={downloading}
@@ -157,19 +169,25 @@ export default function Downloader({ handleRotate, flipFinished }) {
               <CheckIcon />
             </Button>
           )}
-          {downloading && (
-            <LinearProgress
-              value={progress}
-              variant='determinate'
-              sx={{ height: '10px', width: '100%', marginTop: '10px' }}
-            />
-          )}
+          <div className='flex h-[10px] w-full mb-3'>
+            {downloading && (
+              <LinearProgress
+                value={progress}
+                variant='determinate'
+                sx={{ height: '10px', width: '100%', marginTop: '10px' }}
+              />
+            )}
+          </div>
           {errorMessage && (
             <div>
               <p className='mt-8'>{errorMessage}</p>
             </div>
           )}
         </div>
+        <ImageDisplay
+          currentSong={currentSong}
+          songs={songs}
+        />
         <footer className='absolute bottom-1 text-gray-700 text-sm'>Created with ❤️ by Sootax#9268</footer>
       </div>
     </ThemeProvider>
@@ -188,8 +206,8 @@ const defaultTheme = createTheme({
       root: {
         '&:hover': {
           backgroundColor: 'primary',
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 });

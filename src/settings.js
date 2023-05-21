@@ -45,9 +45,28 @@ function savePath(path) {
   storage.set('path', path)
 }
 
+function saveSettings(settings) {
+  storage.set('settings', settings)
+}
+
+function getSettings() {
+  const defaultSettings = {
+    batchSize: 5,
+  };
+  const customSettings = storage.get('settings')
+  if (customSettings) {
+    return customSettings
+  } else {
+    storage.set('settings', defaultSettings)
+    return defaultSettings
+  }
+}
+
 module.exports = {
   getBounds,
   saveBounds,
   getPath,
-  savePath
+  savePath,
+  saveSettings,
+  getSettings
 }
