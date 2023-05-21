@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('api', {
     }
   },
   receive: (channel, func) => {
-    const validChannels = ['download', 'getPath'];
+    const validChannels = ['download', 'getPath', 'progress'];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (event, ...args) => func(...args));
     }

@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 module.exports = {
   packagerConfig: {
     icon: './src/icon.ico',
@@ -7,6 +9,7 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
+        name: 'Soundify',
         authors: '3jeunami82lekw@gmail.com // Sootax#9268',
         description: 'Downloades music from youtube and soundcloud. Playlists are not yet supported.',
       },
@@ -29,14 +32,14 @@ module.exports = {
       name: '@electron-forge/publisher-github',
       config: {
         repository: {
-          owner: 'me',
-          name: ''
+          owner: 'Sootax',
+          name: 'music-downloader',
         },
         authToken: process.env.GITHUB_TOKEN,
         prerelease: true,
-      }
-    }
-  ]
+      },
+    },
+  ],
   plugins: [
     {
       name: '@electron-forge/plugin-webpack',

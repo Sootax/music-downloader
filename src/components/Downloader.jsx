@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import DownloadIcon from '@mui/icons-material/Download';
 import CheckIcon from '@mui/icons-material/Check';
-import { ThemeProvider, createTheme, TextField, Button, Box, CircularProgress } from '@mui/material';
+import { ThemeProvider, createTheme, TextField, Button, Box, LinearProgress } from '@mui/material';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 export default function Downloader() {
@@ -17,23 +17,41 @@ export default function Downloader() {
 
   const [downloadError, setDownloadError] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [progress, setProgress] = useState(0);
+
+  const updateProgress = () => {
+    window.api.receive('progress', (progress) => {
+      setProgress(progress);
+    })
+  }
+
+  useEffect(() => {
+    if (progress === 100) {
+      setTimeout(() => {
+        setDownloading(false);
+        setDownloadSuccess(true);
+        setProgress(0);
+      }, 1000);
+      setTimeout(() => setDownloadSuccess(false), 2000);
+    }
+  }, [progress])
 
   const handleDownload = async () => {
-    if (validate()) {
+    const [isValid, matches] = validate();
+    const match = Object.keys(matches).find((key) => matches[key]);
+
+    if (isValid) {
+      setErrorMessage('');
       setDownloading(true);
-      window.api.send('download', downloadUrlRef.current.value);
+      updateProgress();
+      window.api.send('download', { url: downloadUrlRef.current.value, match: match });
       window.api.receive('download', (data) => {
-        setDownloading(false);
         if (data.error) {
+          setErrorMessage(data.errorMessage.message);
+          setDownloading(false);
           setDownloadError(true);
-          setTimeout(() => {
-            setDownloadError(false);
-          }, 1000);
-        } else if (data.finishedDownloading) {
-          setDownloadSuccess(true);
-          setTimeout(() => {
-            setDownloadSuccess(false);
-          }, 1000);
+          setTimeout(() => setDownloadError(false), 1000);
         }
       });
     }
@@ -43,7 +61,9 @@ export default function Downloader() {
     const newInputError = { ...inputError };
     let isValid = true;
 
-    if (!validateUrl()) {
+    const [hasMatches, matches] = validateUrl();
+
+    if (!hasMatches) {
       newInputError.downloadUrl.error = true;
       isValid = false;
     } else {
@@ -51,14 +71,25 @@ export default function Downloader() {
     }
 
     setInputError(newInputError);
-    return isValid;
+    return [isValid, matches];
   };
 
   const validateUrl = () => {
     const url = downloadUrlRef.current.value;
-    const youtubeRegex = /^(?=.*youtube)(?!.*\blist\b).*$/igm
-    const soundCloudRegex = /^(?=.*soundcloud)(?!.*\/sets\/).*$/igm
-    return youtubeRegex.test(url) || soundCloudRegex.test(url);
+
+    const youtubeSingularRegex = /^(?=.*youtube)(?!.*\blist\b).*$/i;
+    const youtubePlaylistRegex = /^(?=.*youtube).*\bplaylist\?list=([^&#]+)/i;
+    const soundCloudSingularRegex = /^(?=.*soundcloud)(?!.*\/sets\/).*$/i;
+    const soundCloudPlaylistRegex = /^(?=.*soundcloud).*\/sets\/.*$/i;
+
+    const matches = {
+      youtubeSingular: youtubeSingularRegex.test(url),
+      youtubePlaylist: youtubePlaylistRegex.test(url),
+      soundCloudSingular: soundCloudSingularRegex.test(url),
+      soundCloudPlaylist: soundCloudPlaylistRegex.test(url),
+    };
+    const hasMatches = Object.values(matches).some((match) => match);
+    return [hasMatches, matches];
   };
 
   return (
@@ -115,6 +146,18 @@ export default function Downloader() {
             >
               <CheckIcon />
             </Button>
+          )}
+          {downloading && (
+            <LinearProgress
+              value={progress}
+              variant='determinate'
+              sx={{ height: '10px', width: '100%', marginTop: '10px' }}
+            />
+          )}
+          {errorMessage && (
+            <div>
+              <p className='mt-8'>{errorMessage}</p>
+            </div>
           )}
         </div>
         <footer className='absolute bottom-1 text-gray-700 text-sm'>Created with ❤️ by Sootax#9268</footer>

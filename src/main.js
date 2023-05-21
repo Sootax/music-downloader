@@ -1,12 +1,18 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const fs = require('fs');
+const async = require('async');
 const ytdl = require('ytdl-core');
+const ytpl = require('ytpl');
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+const ffmpeg = require('fluent-ffmpeg');
+const fs = require('fs');
 const { SoundCloud } = require('scdl-core');
 const { getPath, savePath } = require('./settings');
 const { getBounds, saveBounds } = require('./settings');
+
 require('dotenv').config();
 
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -19,15 +25,15 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
-    minWidth: 405, 
+    minWidth: 405,
     minHeight: 493,
     x: bounds.x,
     y: bounds.y,
     icon: './src/icon.ico',
     webPreferences: {
-      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY
-    }
-  })
+      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+    },
+  });
 
   mainWindow.on('close', () => saveBounds(mainWindow.getBounds()));
 
@@ -64,54 +70,111 @@ app.on('activate', () => {
   }
 });
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
-
-ipcMain.on('download', async (event, downloadLink) => {
+ipcMain.on('download', async (event, downloadObject) => {
   const path = getPath();
-  try {
-    const info = await ytdl.getInfo(downloadLink);
-    const title = info.videoDetails.title;
-    const fileName = `${path}\\${title}.webm`;
-    ytdl(downloadLink, { quality: 'highestaudio' })
-      .pipe(fs.createWriteStream(fileName))
-      .on('finish', () => event.reply('download', { finishedDownloading: true, error: false }));
-  } catch (error) {
-    if (!error === 'Invalid url') {
-      event.reply('download', { finishedDownloading: false, error: true });
-    }
-  }
+  let completedDownloads = 0;
+  let totalSongs = 0;
 
-  try {
-    await SoundCloud.connect();
-    const track = await SoundCloud.tracks.getTrack(downloadLink);
-    const title = track.title;
-    const fileName = `${path}\\${title}.webm`;
-    const stream = await SoundCloud.download(downloadLink);
-    stream.pipe(fs.createWriteStream(fileName));
-    stream.on('finish', () => event.reply('download', { finishedDownloading: true, error: false }));
-  } catch (error) {
-    if (!error === 'Invalid url') {
-       event.reply('download', { finishedDownloading: false, error: true });
+  const progressCallback = (progress = 0, isPlaylist) => {
+    if (isPlaylist) {
+      completedDownloads += 1;
+      const overAllProgress = (completedDownloads / totalSongs) * 100;
+      event.reply('progress', overAllProgress);
+    } else {
+      event.reply('progress', progress);
     }
+  };
+
+  if (downloadObject.match === 'youtubeSingular') {
+    totalSongs = 1;
+    const info = await ytdl.getInfo(downloadObject.url);
+    const song = {
+      title: info.videoDetails.title,
+      url: downloadObject.url,
+    };
+    await downloadYoutubeSong(song, path, progressCallback);
+  } else if (downloadObject.match === 'youtubePlaylist') {
+    const results = await ytpl(downloadObject.url, { limit: 9999 });
+    const songs = results.items.map((result) => ({
+      title: result.title,
+      url: result.shortUrl,
+    }));
+    totalSongs = songs.length;
+
+    async.eachLimit(songs, 10, async (song) => {
+      await downloadYoutubeSong(song, path, progressCallback, true);
+    });
+  } else if (downloadObject.match === 'soundCloudSingular') {
+    // TODO: add support for singular soundcloud songs
+  } else if (downloadObject.match === 'soundCloudPlaylist') {
+    // TODO: add support for playlist soundcloud songs
   }
 });
 
+async function downloadYoutubeSong(song, path, progressCallback, isPlaylist) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const title = filterCharacters(song.title);
+      const filePath = `${path}\\${title}.mp3`;
+      const videoStream = await ytdl(song.url, { quality: 'highestaudio' });
+
+      let totalBytes = 0;
+      let downloadedSize = 0;
+      videoStream.on('response', (response) => (totalBytes = response.headers['content-length']));
+
+      videoStream.on('progress', (chunkLength) => {
+        if (!isPlaylist) {
+          downloadedSize += chunkLength;
+          let downloadedPercent = (downloadedSize / totalBytes) * 100;
+          progressCallback(downloadedPercent, isPlaylist);
+        }
+      });
+
+      ffmpeg(videoStream)
+        .audioBitrate(128)
+        .save(filePath)
+        .on('end', () => {
+          if (isPlaylist) {
+            progressCallback(0, isPlaylist);
+          }
+          resolve();
+        })
+        .on('error', (error) => {
+          if (isPlaylist) {
+            progressCallback(0, isPlaylist);
+          }
+          console.error(error);
+          resolve();
+        });
+    } catch (error) {
+      if (isPlaylist) {
+        progressCallback(0, isPlaylist);
+      }
+      console.log(error);
+      resolve();
+    }
+  });
+}
+
+function filterCharacters(originalTitle) {
+  return originalTitle.replace(/[/\\?%*:|"<>]/g, ' ');
+}
+
 ipcMain.on('getPath', (event) => {
-  const path = getPath()
-  event.reply('getPath', path)
-})
+  const path = getPath();
+  event.reply('getPath', path);
+});
 
 ipcMain.on('savePath', (event, path) => {
-  savePath(path)
-})
+  savePath(path);
+});
 
 ipcMain.on('selectPath', async (event) => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
-  })
+    properties: ['openDirectory'],
+  });
   if (!result.canceled) {
-    const newPath = result.filePaths[0]
-    savePath(newPath)
+    const newPath = result.filePaths[0];
+    savePath(newPath);
   }
-})
+});
