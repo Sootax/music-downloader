@@ -14,7 +14,7 @@ export default function App() {
     }, 180);
   };
   return (
-    <div className='flex min-h-screen items-center justify-center bg-blue-800 bg-gradient-to-br from-gray-900 via-gray-800/90 to-gray-800'>
+    <div className='flex min-h-screen items-center justify-center bg-blue-800 bg-gradient-to-br from-gray-900 via-gray-800/90 to-gray-800 overflow-hidden'>
       <div className='group h-[400px] w-[300px] [perspective:1000px]'>
         <div
           className={`relative h-full w-full rounded-xl shadow-xl transition-all duration-[500ms] [transform-style:preserve-3d] ${
@@ -30,7 +30,7 @@ export default function App() {
             </div>
           </div>
           <div className='absolute [transform:rotateY(180deg)] [backface-visibility:hidden]'>
-            <div class='h-full w-full'>
+            <div className='h-full w-full'>
               <Config
                 handleRotate={handleRotate}
                 flipFinis

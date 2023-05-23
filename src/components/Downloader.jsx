@@ -8,7 +8,6 @@ import ImageDisplay from './ImageDisplay.jsx';
 
 export default function Downloader({ handleRotate, flipFinished }) {
   const [downloading, setDownloading] = useState(false);
-  const [songs, setSongs] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
 
   const downloadUrlRef = useRef(null);
@@ -23,13 +22,7 @@ export default function Downloader({ handleRotate, flipFinished }) {
   const [downloadError, setDownloadError] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [progress, setProgress] = useState(0);
-
-  const updateSongs = async () => {
-    window.api.receive('getSongs', (songs) => {
-      setSongs(songs);
-    });
-  };
+  const [progress, setProgress] = useState(1);
 
   const updateCurrentSong = async () => {
     window.api.receive('getCurrentSong', (song) => {
@@ -44,7 +37,7 @@ export default function Downloader({ handleRotate, flipFinished }) {
   };
 
   useEffect(() => {
-    if (progress === 100) {
+    if (progress >= 100) {
       setTimeout(() => {
         setCurrentSong(null);
         setDownloading(false);
@@ -63,7 +56,6 @@ export default function Downloader({ handleRotate, flipFinished }) {
       setErrorMessage('');
       setDownloading(true);
       updateProgress();
-      updateSongs();
       updateCurrentSong();
       window.api.send('download', { url: downloadUrlRef.current.value, match: match });
       window.api.receive('download', (data) => {
@@ -114,7 +106,7 @@ export default function Downloader({ handleRotate, flipFinished }) {
 
   if (flipFinished) {
     return (
-      <div className='bg-gray-800 h-[400px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl shadow-md shadow-gray-950/50 relative'></div>
+      <div className='bg-gray-800 h-[430px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl shadow-md shadow-gray-950/50 relative'></div>
     );
   }
 
@@ -186,7 +178,6 @@ export default function Downloader({ handleRotate, flipFinished }) {
         </div>
         <ImageDisplay
           currentSong={currentSong}
-          songs={songs}
         />
         <footer className='absolute bottom-1 text-gray-700 text-sm'>Created with ❤️ by Sootax#9268</footer>
       </div>

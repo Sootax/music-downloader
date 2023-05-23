@@ -25,7 +25,7 @@ export default function Config({ handleRotate }) {
 
   return (
     <ThemeProvider theme={defaultTheme}>
-      <div className='bg-gray-800 h-[400px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl relative'>
+      <div className='bg-gray-800 h-[430px] text-white font-bold p-4 flex flex-col items-center w-[300px] rounded-xl relative'>
         <div className='absolute right-2 top-2'>
           <IconButton onClick={handleRotate}>
             <SettingsIcon />

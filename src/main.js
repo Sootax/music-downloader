@@ -23,11 +23,12 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 const createWindow = () => {
   const bounds = getBounds();
   // Create the browser window.
+  console.log(bounds)
   const mainWindow = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
     minWidth: 405,
-    minHeight: 493,
+    minHeight: 583,
     x: bounds.x,
     y: bounds.y,
     icon: './src/icon.ico',
@@ -104,7 +105,6 @@ ipcMain.on('download', async (event, downloadObject) => {
       url: result.shortUrl,
       thumbnail: result.bestThumbnail.url,
     }));
-    event.reply('getSongs', songs);
     totalSongs = songs.length;
 
     if (settings.batchSize > 1) {
@@ -118,74 +118,96 @@ ipcMain.on('download', async (event, downloadObject) => {
       });
     }
   } else if (downloadObject.match === 'soundCloudSingular') {
-    // TODO: add support for singular soundcloud songs
+    await SoundCloud.connect();
+    const result = await SoundCloud.tracks.getTrack(downloadObject.url);
+    const song = {
+      title: result.title,
+      url: result.permalink_url,
+      thumbnail: result.artwork_url,
+      duration: result.media.transcodings[0].duration / 1000,
+    };
+    event.reply('getCurrentSong', song);
+    await downloadSoundCloudSong(song, path, progressCallback, false);
   } else if (downloadObject.match === 'soundCloudPlaylist') {
     await SoundCloud.connect();
     const results = await SoundCloud.playlists.getPlaylist(downloadObject.url);
-    const songs = results.map((result) => ({
+    const songs = results.tracks.map((result) => ({
       title: result.title,
       url: result.permalink_url,
       thumbnail: result.artwork_url,
     }));
-    event.reply('getSongs', songs);
     totalSongs = songs.length;
 
     if (settings.batchSize > 1) {
-      async.eachLimit(songs, settings.batchSize, async(song));
+      async.eachLimit(songs, settings.batchSize, async (song) => {
+        event.reply('getCurrentSong', song);
+        await downloadSoundCloudSong(song, path, progressCallback, true);
+      });
+    } else {
+      async.eachLimit(songs, 1, async (song) => {
+        await downloadSoundCloudSong(song, path, progressCallback, true);
+      });
     }
   }
 });
 
 async function downloadYoutubeSong(song, path, progressCallback, isPlaylist) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const title = filterCharacters(song.title);
-      const filePath = `${path}\\${title}.mp3`;
-      const videoStream = await ytdl(song.url, { quality: 'highestaudio' });
+  return new Promise(async (resolve) => {
+    const title = filterCharacters(song.title);
+    const filePath = `${path}\\${title}.mp3`;
+    const videoStream = await ytdl(song.url, { quality: 'highestaudio' });
 
-      let totalBytes = 0;
-      let downloadedSize = 0;
-      videoStream.on('response', (response) => (totalBytes = response.headers['content-length']));
+    let totalBytes = 0;
+    let downloadedSize = 0;
+    videoStream.on('response', (response) => (totalBytes = response.headers['content-length']));
 
-      videoStream.on('progress', (chunkLength) => {
-        if (!isPlaylist) {
+    videoStream.on('progress', (chunkLength) => {
+      if (!isPlaylist) {
           downloadedSize += chunkLength;
           let downloadedPercent = (downloadedSize / totalBytes) * 100;
           progressCallback(downloadedPercent, isPlaylist);
-        }
-      });
-
-      ffmpeg(videoStream)
-        .audioBitrate(128)
-        .save(filePath)
-        .on('end', () => {
-          if (isPlaylist) {
-            progressCallback(0, isPlaylist);
-          }
-          resolve();
-        })
-        .on('error', (error) => {
-          if (isPlaylist) {
-            progressCallback(0, isPlaylist);
-          }
-          console.error(error);
-          resolve();
-        });
-    } catch (error) {
-      if (isPlaylist) {
-        progressCallback(0, isPlaylist);
       }
-      console.log(error);
-      resolve();
-    }
+    });
+
+    ffmpeg(videoStream)
+      .audioBitrate(128)
+      .save(filePath)
+      .on('end', () => {
+        if (isPlaylist) {
+          progressCallback(0, isPlaylist);
+        }
+        resolve();
+      })
+      .on('error', (error) => {
+        if (isPlaylist) {
+          progressCallback(0, isPlaylist);
+        }
+        console.error(error);
+        resolve();
+      });
   });
 }
 
-async function downloadSounCloudSong(song, path, progressCallback, isPlaylist) {
-  return new Promise(async (resolve, reject) => {
+async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist) {
+  return new Promise(async (resolve) => {
     const title = filterCharacters(song.title);
     const filePath = `${path}\\${title}.mp3`;
     const videoStream = await SoundCloud.download(song.url);
+
+    let totalDuration = song.duration;   
+    let totalDownloadPercentage = 0;   
+    videoStream.on('response', (response) => (totalBytes = response.headers['content-length']));
+
+    videoStream.on('progress', (chunkLength) => {
+      if (!isPlaylist) {
+        let chunkLengthSeconds = chunkLength.duration / 1000;
+        let percentage = (chunkLengthSeconds / totalDuration) * 100;
+        totalDownloadPercentage += percentage;
+        console.log(Math.ceil(totalDownloadPercentage));
+        progressCallback(Math.ceil(totalDownloadPercentage), isPlaylist);
+      }
+    });
+    
     ffmpeg(videoStream)
       .audioBitrate(128)
       .save(filePath)
