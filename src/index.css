@@ -7,6 +7,10 @@
 @tailwind components;
 @tailwind utilities;
 
+body {
+  background: #111827;
+}
+
 .fade-enter {
   opacity: 0;
 }

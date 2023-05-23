@@ -10,6 +10,11 @@ const { getPath, savePath, getBounds, saveBounds, getSettings, saveSettings } = 
 
 require('dotenv').config();
 
+// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+if (require('electron-squirrel-startup')) {
+  app.quit();
+}
+
 let ffmpegPath;
 
 if (app.isPackaged) {
@@ -20,15 +25,17 @@ if (app.isPackaged) {
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+let mainWindow;
+
 const createWindow = () => {
   const bounds = getBounds();
   // Create the browser window.
-  console.log(bounds)
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
     minWidth: 405,
     minHeight: 583,
+    show: false,
     x: bounds.x,
     y: bounds.y,
     icon: './src/icon.ico',
@@ -253,3 +260,7 @@ ipcMain.on('getSettings', (event) => {
 ipcMain.on('openGithub', (event) => {
   shell.openExternal('https://github.com/Sootax/music-downloader');
 });
+
+ipcMain.on('componentReady', (event) => {
+  mainWindow.show();
+})

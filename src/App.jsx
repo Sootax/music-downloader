@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Downloader from './components/Downloader.jsx';
 import Config from './components/Config.jsx';
 import './index.css';
@@ -6,13 +6,18 @@ import './index.css';
 export default function App() {
   const [flip, setFlip] = useState(false);
   const [flipFinished, setFlipFinished] = useState(false);
+
+  useEffect(() => {
+    window.api.send('componentReady');
+  }, []);
+
   const handleRotate = () => {
     setFlip(!flip);
     setTimeout(() => {
       setFlipFinished(!flipFinished);
-      console.log('hello')
     }, 180);
   };
+
   return (
     <div className='flex min-h-screen items-center justify-center bg-blue-800 bg-gradient-to-br from-gray-900 via-gray-800/90 to-gray-800 overflow-hidden'>
       <div className='group h-[400px] w-[300px] [perspective:1000px]'>

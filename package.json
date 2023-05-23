@@ -1,7 +1,7 @@
 {
   "name": "soundify",
   "productName": "soundify",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Downloades music from youtube and soundcloud.",
   "main": ".webpack/main",
   "scripts": {
@@ -47,6 +47,7 @@
     "@mui/icons-material": "^5.11.16",
     "@mui/lab": "^5.0.0-alpha.130",
     "dotenv": "^16.0.3",
+    "electron-squirrel-startup": "^1.0.0",
     "electron-store": "^8.1.0",
     "ffmpeg-static": "^5.1.0",
     "fluent-ffmpeg": "^2.1.2",
