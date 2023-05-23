@@ -3,7 +3,6 @@ const path = require('path');
 const async = require('async');
 const ytdl = require('ytdl-core');
 const ytpl = require('ytpl');
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const { SoundCloud } = require('scdl-core');
@@ -11,12 +10,15 @@ const { getPath, savePath, getBounds, saveBounds, getSettings, saveSettings } = 
 
 require('dotenv').config();
 
-ffmpeg.setFfmpegPath(ffmpegPath);
+let ffmpegPath;
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-  app.quit();
+if (app.isPackaged) {
+  ffmpegPath = path.join(process.resourcesPath, 'ffmpeg.exe');
+} else {
+  ffmpegPath = require('ffmpeg-static');
 }
+
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 const createWindow = () => {
   const bounds = getBounds();
@@ -91,7 +93,9 @@ ipcMain.on('download', async (event, downloadObject) => {
     const song = {
       title: info.videoDetails.title,
       url: downloadObject.url,
+      thumbnail: info.videoDetails.thumbnails[4].url,
     };
+    event.reply('getCurrentSong', song);
     await downloadYoutubeSong(song, path, progressCallback);
   } else if (downloadObject.match === 'youtubePlaylist') {
     const results = await ytpl(downloadObject.url, { limit: 9999 });
@@ -105,20 +109,30 @@ ipcMain.on('download', async (event, downloadObject) => {
 
     if (settings.batchSize > 1) {
       async.eachLimit(songs, settings.batchSize, async (song) => {
-        event.reply('getCurrentSong', song)
+        event.reply('getCurrentSong', song);
         await downloadYoutubeSong(song, path, progressCallback, true);
       });
     } else {
       async.eachLimit(songs, 1, async (song) => {
-        console.log(song.title);
         await downloadYoutubeSong(song, path, progressCallback, true);
       });
     }
-    
   } else if (downloadObject.match === 'soundCloudSingular') {
     // TODO: add support for singular soundcloud songs
   } else if (downloadObject.match === 'soundCloudPlaylist') {
-    // TODO: add support for playlist soundcloud songs
+    await SoundCloud.connect();
+    const results = await SoundCloud.playlists.getPlaylist(downloadObject.url);
+    const songs = results.map((result) => ({
+      title: result.title,
+      url: result.permalink_url,
+      thumbnail: result.artwork_url,
+    }));
+    event.reply('getSongs', songs);
+    totalSongs = songs.length;
+
+    if (settings.batchSize > 1) {
+      async.eachLimit(songs, settings.batchSize, async(song));
+    }
   }
 });
 
@@ -167,6 +181,30 @@ async function downloadYoutubeSong(song, path, progressCallback, isPlaylist) {
   });
 }
 
+async function downloadSounCloudSong(song, path, progressCallback, isPlaylist) {
+  return new Promise(async (resolve, reject) => {
+    const title = filterCharacters(song.title);
+    const filePath = `${path}\\${title}.mp3`;
+    const videoStream = await SoundCloud.download(song.url);
+    ffmpeg(videoStream)
+      .audioBitrate(128)
+      .save(filePath)
+      .on('end', () => {
+        if (isPlaylist) {
+          progressCallback(0, isPlaylist);
+        }
+        resolve();
+      })
+      .on('error', (error) => {
+        if (isPlaylist) {
+          progressCallback(0, isPlaylist);
+        }
+        console.log(error);
+        resolve();
+      });
+  });
+}
+
 function filterCharacters(originalTitle) {
   return originalTitle.replace(/[/\\?%*:|"<>]/g, ' ');
 }
@@ -183,13 +221,13 @@ ipcMain.on('selectPath', async (event) => {
 
 ipcMain.on('saveSettings', (event, settings) => {
   saveSettings(settings);
-})
+});
 
 ipcMain.on('getSettings', (event) => {
-  const settings = getSettings()
+  const settings = getSettings();
   event.reply('getSettings', settings);
-})
+});
 
 ipcMain.on('openGithub', (event) => {
   shell.openExternal('https://github.com/Sootax/music-downloader');
-})
+});

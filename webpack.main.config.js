@@ -1,4 +1,6 @@
-const nodeExternals = require('webpack-node-externals');
+const webpack = require('webpack');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+const ffmpegPath = require('ffmpeg-static');
 
 module.exports = {
   /**
@@ -10,13 +12,17 @@ module.exports = {
   module: {
     rules: require('./webpack.rules'),
   },
-  externals: [
-    nodeExternals({
-      modulesFromFile: {
-        fileName: './package.json',
-        includeInBundle: ['devDependencies', 'dependencies'],
-        excludeFromBundle: ['excludeFromBundle'],
-      },
+  plugins: [
+    new webpack.DefinePlugin({
+      'process.env.FLUENTFFMPEG_COV': false,
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: ffmpegPath,
+          to: '.',
+        },
+      ],
     }),
   ],
 };

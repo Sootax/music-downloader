@@ -1,8 +1,12 @@
 require('dotenv').config();
+const path = require('path');
+const ffmpegPath = require('ffmpeg-static');
 
 module.exports = {
   packagerConfig: {
     icon: './src/icon.ico',
+    asar: true,
+    extraResource: [ffmpegPath],
   },
   rebuildConfig: {},
   makers: [
@@ -60,6 +64,10 @@ module.exports = {
           ],
         },
       },
+    },
+    {
+      name: '@electron-forge/plugin-auto-unpack-natives',
+      config: {},
     },
   ],
 };
