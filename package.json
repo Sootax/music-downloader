@@ -2,7 +2,7 @@
   "name": "soundify",
   "productName": "soundify",
   "version": "0.6.0",
-  "description": "Downloades music from youtube and soundcloud.",
+  "description": "Downloads music from youtube and soundcloud.",
   "main": ".webpack/main",
   "scripts": {
     "start": "electron-forge start",
