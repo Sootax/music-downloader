@@ -8,6 +8,8 @@ const fs = require('fs');
 const { SoundCloud } = require('scdl-core');
 const { getPath, savePath, getBounds, saveBounds, getSettings, saveSettings } = require('./settings');
 
+import validateFilename from './helpers/validateFilename.js';
+
 require('dotenv').config();
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -52,7 +54,7 @@ const createWindow = () => {
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
   // Open the DevTools.
-  if (process.env.enviroment === 'dev') {
+  if (process.env.environment === 'dev') {
     mainWindow.webContents.openDevTools();
   }
 };
@@ -160,7 +162,7 @@ ipcMain.on('download', async (event, downloadObject) => {
 
 async function downloadYoutubeSong(song, path, progressCallback, isPlaylist) {
   return new Promise(async (resolve) => {
-    const title = filterCharacters(song.title);
+    const title = validateFilename(song.title);
     const filePath = `${path}\\${title}.mp3`;
     const videoStream = await ytdl(song.url, { quality: 'highestaudio' });
 
@@ -197,7 +199,7 @@ async function downloadYoutubeSong(song, path, progressCallback, isPlaylist) {
 
 async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist) {
   return new Promise(async (resolve) => {
-    const title = filterCharacters(song.title);
+    const title = validateFilename(song.title);
     const filePath = `${path}\\${title}.mp3`;
     const videoStream = await SoundCloud.download(song.url);
 
@@ -234,12 +236,6 @@ async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist) 
   });
 }
 
-
-// Filters the song filename for invalid characters.
-function filterCharacters(originalTitle) {
-  return originalTitle.replace(/[/\\?%*:|"<>]/g, ' ');
-}
-
 // Save the path to the configuration file.
 // TODO: Merge with saveSettings
 ipcMain.on('selectPath', async (event) => {
@@ -267,7 +263,6 @@ ipcMain.on('getSettings', (event) => {
 ipcMain.on('openGithub', (event) => {
   shell.openExternal('https://github.com/Sootax/music-downloader');
 });
-
 
 // Waits for react to be lodaded before showing mainWindow.
 ipcMain.on('componentReady', (event) => {
