@@ -170,9 +170,9 @@ async function downloadYoutubeSong(song, path, progressCallback, isPlaylist) {
 
     videoStream.on('progress', (chunkLength) => {
       if (!isPlaylist) {
-          downloadedSize += chunkLength;
-          let downloadedPercent = (downloadedSize / totalBytes) * 100;
-          progressCallback(downloadedPercent, isPlaylist);
+        downloadedSize += chunkLength;
+        let downloadedPercent = (downloadedSize / totalBytes) * 100;
+        progressCallback(downloadedPercent, isPlaylist);
       }
     });
 
@@ -201,8 +201,8 @@ async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist) 
     const filePath = `${path}\\${title}.mp3`;
     const videoStream = await SoundCloud.download(song.url);
 
-    let totalDuration = song.duration;   
-    let totalDownloadPercentage = 0;   
+    let totalDuration = song.duration;
+    let totalDownloadPercentage = 0;
     videoStream.on('response', (response) => (totalBytes = response.headers['content-length']));
 
     videoStream.on('progress', (chunkLength) => {
@@ -214,7 +214,7 @@ async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist) 
         progressCallback(Math.ceil(totalDownloadPercentage), isPlaylist);
       }
     });
-    
+
     ffmpeg(videoStream)
       .audioBitrate(128)
       .save(filePath)
@@ -234,10 +234,14 @@ async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist) 
   });
 }
 
+
+// Filters the song filename for invalid characters.
 function filterCharacters(originalTitle) {
   return originalTitle.replace(/[/\\?%*:|"<>]/g, ' ');
 }
 
+// Save the path to the configuration file.
+// TODO: Merge with saveSettings
 ipcMain.on('selectPath', async (event) => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory'],
@@ -248,19 +252,24 @@ ipcMain.on('selectPath', async (event) => {
   }
 });
 
+// Saves the settings to the configuration file.
 ipcMain.on('saveSettings', (event, settings) => {
   saveSettings(settings);
 });
 
+// Gets the settings from the configuration file and sends back the settings.
 ipcMain.on('getSettings', (event) => {
   const settings = getSettings();
   event.reply('getSettings', settings);
 });
 
+// Opens the github repo.
 ipcMain.on('openGithub', (event) => {
   shell.openExternal('https://github.com/Sootax/music-downloader');
 });
 
+
+// Waits for react to be lodaded before showing mainWindow.
 ipcMain.on('componentReady', (event) => {
   mainWindow.show();
-})
+});
