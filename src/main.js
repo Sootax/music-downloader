@@ -129,8 +129,6 @@ ipcMain.on('START_DOWNLOAD', async (event, downloadObject) => {
         if (!isCancelled) {
           event.reply('STATUS', { currentSong: song });
           await downloadFn(song, path, progressCallback, true, event);
-        } else {
-          console.log('DOWNLOAD IS CANCELED', song);
         }
       });
     }
