@@ -81,86 +81,83 @@ app.on('activate', () => {
   }
 });
 
-ipcMain.on('download', async (event, downloadObject) => {
+ipcMain.on('START_DOWNLOAD', async (event, downloadObject) => {
   const path = getPath();
   const settings = getSettings();
   let completedDownloads = 0;
   let totalSongs = 0;
 
   const progressCallback = (progress = 0, isPlaylist) => {
-    if (isPlaylist) {
-      completedDownloads += 1;
-      const overAllProgress = (completedDownloads / totalSongs) * 100;
-      event.reply('progress', overAllProgress);
+    const progressCeil = Math.ceil(progress);
+    const progressData = isPlaylist
+      ? { progress: Math.ceil((++completedDownloads / totalSongs) * 100) }
+      : { progress: progressCeil };
+    event.reply('STATUS', progressData);
+  };
+
+  const download = async (sourceType, url, playlist = false) => {
+    const downloadFn = sourceType === 'youtube' ? downloadYoutubeSong : downloadSoundCloudSong;
+
+    if (!playlist) {
+      if (sourceType === 'soundcloud') {
+        await SoundCloud.connect();
+      }
+      const info = await downloadInfo[sourceType](url);
+      const song = formatSong(info, sourceType);
+      event.reply('STATUS', { currentSong: song });
+      await downloadFn(song, path, progressCallback, false, event);
     } else {
-      event.reply('progress', progress);
+      let songs;
+      if (sourceType === 'soundcloud') {
+        await SoundCloud.connect();
+        const results = await downloadInfo[sourceType + 'Playlist'](url);
+        songs = results.tracks.map((result) => formatSong(result, sourceType, playlist));
+      } else if (sourceType === 'youtube') {
+        const results = await downloadInfo[sourceType + 'Playlist'](url);
+        songs = results.items.map((result) => formatSong(result, sourceType, playlist));
+      }
+      totalSongs = songs.length;
+      const batchSize = settings.batchSize > 1 ? settings.batchSize : 1;
+      async.eachLimit(songs, batchSize, async (song) => {
+        console.log(song.title)
+        event.reply('STATUS', { currentSong: song });
+        await downloadFn(song, path, progressCallback, true, event);
+      });
     }
   };
 
-  if (downloadObject.match === 'youtubeSingular') {
-    totalSongs = 1;
-    const info = await ytdl.getInfo(downloadObject.url);
-    const song = {
-      title: info.videoDetails.title,
-      url: downloadObject.url,
-      thumbnail: info.videoDetails.thumbnails[4].url,
-    };
-    event.reply('getCurrentSong', song);
-    await downloadYoutubeSong(song, path, progressCallback);
-  } else if (downloadObject.match === 'youtubePlaylist') {
-    const results = await ytpl(downloadObject.url, { limit: 9999 });
-    const songs = results.items.map((result) => ({
-      title: result.title,
-      url: result.shortUrl,
-      thumbnail: result.bestThumbnail.url,
-    }));
-    totalSongs = songs.length;
-
-    if (settings.batchSize > 1) {
-      async.eachLimit(songs, settings.batchSize, async (song) => {
-        event.reply('getCurrentSong', song);
-        await downloadYoutubeSong(song, path, progressCallback, true);
-      });
-    } else {
-      async.eachLimit(songs, 1, async (song) => {
-        await downloadYoutubeSong(song, path, progressCallback, true);
-      });
-    }
-  } else if (downloadObject.match === 'soundCloudSingular') {
-    await SoundCloud.connect();
-    const result = await SoundCloud.tracks.getTrack(downloadObject.url);
-    const song = {
-      title: result.title,
-      url: result.permalink_url,
-      thumbnail: result.artwork_url,
-      duration: result.media.transcodings[0].duration / 1000,
-    };
-    event.reply('getCurrentSong', song);
-    await downloadSoundCloudSong(song, path, progressCallback, false);
-  } else if (downloadObject.match === 'soundCloudPlaylist') {
-    await SoundCloud.connect();
-    const results = await SoundCloud.playlists.getPlaylist(downloadObject.url);
-    const songs = results.tracks.map((result) => ({
-      title: result.title,
-      url: result.permalink_url,
-      thumbnail: result.artwork_url,
-    }));
-    totalSongs = songs.length;
-
-    if (settings.batchSize > 1) {
-      async.eachLimit(songs, settings.batchSize, async (song) => {
-        event.reply('getCurrentSong', song);
-        await downloadSoundCloudSong(song, path, progressCallback, true);
-      });
-    } else {
-      async.eachLimit(songs, 1, async (song) => {
-        await downloadSoundCloudSong(song, path, progressCallback, true);
-      });
-    }
-  }
+  const type = downloadObject.match.replace(/Singular|Playlist/, '');
+  const isPlaylist = /Playlist/.test(downloadObject.match);
+  await download(type, downloadObject.url, isPlaylist);
 });
 
-async function downloadYoutubeSong(song, path, progressCallback, isPlaylist) {
+// downloadInfo functions can be stored in an object for easy lookup
+const downloadInfo = {
+  youtube: ytdl.getInfo,
+  youtubePlaylist: ytpl,
+  soundcloud: SoundCloud.tracks.getTrack,
+  soundcloudPlaylist: SoundCloud.playlists.getPlaylist,
+};
+
+// Helper function to format the song object
+const formatSong = (info, sourceType, isPlaylist) => {
+  if (sourceType === 'youtube') {
+    return {
+      title: isPlaylist ? info.title : info.videoDetails.title,
+      url: isPlaylist ? info.shortUrl : info.videoDetails.video_url,
+      thumbnail: isPlaylist ? info.bestThumbnail.url : info.videoDetails.thumbnails[4].url,
+    };
+  } else if (sourceType === 'soundcloud') {
+    return {
+      title: info.title,
+      url: info.permalink_url,
+      thumbnail: info.artwork_url,
+      duration: info.media.transcodings[0].duration / 1000,
+    };
+  }
+};
+
+async function downloadYoutubeSong(song, path, progressCallback, isPlaylist, event) {
   return new Promise(async (resolve) => {
     const title = validateFilename(song.title);
     const filePath = `${path}\\${title}.mp3`;
@@ -188,16 +185,13 @@ async function downloadYoutubeSong(song, path, progressCallback, isPlaylist) {
         resolve();
       })
       .on('error', (error) => {
-        if (isPlaylist) {
-          progressCallback(0, isPlaylist);
-        }
-        console.error(error);
+        event.reply('STATUS', { errorMessage: error });
         resolve();
       });
   });
 }
 
-async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist) {
+async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist, event) {
   return new Promise(async (resolve) => {
     const title = validateFilename(song.title);
     const filePath = `${path}\\${title}.mp3`;
@@ -205,14 +199,12 @@ async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist) 
 
     let totalDuration = song.duration;
     let totalDownloadPercentage = 0;
-    videoStream.on('response', (response) => (totalBytes = response.headers['content-length']));
 
     videoStream.on('progress', (chunkLength) => {
       if (!isPlaylist) {
         let chunkLengthSeconds = chunkLength.duration / 1000;
         let percentage = (chunkLengthSeconds / totalDuration) * 100;
         totalDownloadPercentage += percentage;
-        console.log(Math.ceil(totalDownloadPercentage));
         progressCallback(Math.ceil(totalDownloadPercentage), isPlaylist);
       }
     });
@@ -227,10 +219,7 @@ async function downloadSoundCloudSong(song, path, progressCallback, isPlaylist) 
         resolve();
       })
       .on('error', (error) => {
-        if (isPlaylist) {
-          progressCallback(0, isPlaylist);
-        }
-        console.log(error);
+        event.reply('STATUS', { errorMessage: error });
         resolve();
       });
   });
