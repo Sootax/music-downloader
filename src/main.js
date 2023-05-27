@@ -32,11 +32,12 @@ let mainWindow;
 const createWindow = () => {
   const bounds = getBounds();
   // Create the browser window.
+  console.log(bounds)
   mainWindow = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
     minWidth: 405,
-    minHeight: 583,
+    minHeight: 601,
     show: false,
     x: bounds.x,
     y: bounds.y,
@@ -81,7 +82,14 @@ app.on('activate', () => {
   }
 });
 
+let isCancelled = false;
+
+ipcMain.on('CANCEL_DOWNLOAD', (event) => {
+  isCancelled = true;
+})
+
 ipcMain.on('START_DOWNLOAD', async (event, downloadObject) => {
+  isCancelled = false;
   const path = getPath();
   const settings = getSettings();
   let completedDownloads = 0;
@@ -119,9 +127,12 @@ ipcMain.on('START_DOWNLOAD', async (event, downloadObject) => {
       totalSongs = songs.length;
       const batchSize = settings.batchSize > 1 ? settings.batchSize : 1;
       async.eachLimit(songs, batchSize, async (song) => {
-        console.log(song.title)
-        event.reply('STATUS', { currentSong: song });
-        await downloadFn(song, path, progressCallback, true, event);
+        if (!isCancelled) {
+          event.reply('STATUS', { currentSong: song });
+          await downloadFn(song, path, progressCallback, true, event);
+        } else {
+          console.log('DOWNLOAD IS CANCELED', song);
+        }
       });
     }
   };
