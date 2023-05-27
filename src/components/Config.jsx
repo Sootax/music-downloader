@@ -51,10 +51,10 @@ export default function Config({ handleRotate }) {
               defaultValue={settings.batchSize}
             />
           </div>
-          <div className='flex mt-24 justify-center items-center'>
+          <div className='flex justify-center mt-32 items-center'>
             <Button
               variant='contained'
-              sx={{ width: '70%' }}
+              sx={{ width: '100%' }}
               onClick={handleSettings}
             >
               Save
