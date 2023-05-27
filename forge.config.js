@@ -4,7 +4,7 @@ const ffmpegPath = require('ffmpeg-static');
 
 module.exports = {
   packagerConfig: {
-    icon: './src/icon.ico',
+    icon: './src/icon',
     asar: true,
     extraResource: [ffmpegPath],
   },
@@ -15,7 +15,7 @@ module.exports = {
       config: {
         name: 'Soundify',
         authors: '3jeunami82lekw@gmail.com // Sootax#9268',
-        description: 'Downloades music from youtube and soundcloud. Playlists are not yet supported.',
+        description: 'Downloads music from youtube and soundcloud. Playlists are not yet supported.',
       },
     },
     {
