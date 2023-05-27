@@ -9,7 +9,6 @@ import { ErrorContext } from '../utils/ErrorContext.jsx';
 export default function Downloader({ handleRotate, flipFinished }) {
   const initialStatus = {
     downloading: false,
-    cancelled: false,
     success: false,
     error: false,
     errorMessage: '',
@@ -21,7 +20,7 @@ export default function Downloader({ handleRotate, flipFinished }) {
       case 'START_DOWNLOAD':
         return { ...state, downloading: true };
       case 'CANCEL_DOWNLOAD':
-        return { ...state, cancelled: true, downloading: false };
+        return { ...state, downloading: false, progress: 0 };
       case 'DOWNLOAD_SUCCESS':
         return { ...state, success: true, downloading: false, progress: 0 };
       case 'DOWNLOAD_ERROR':
@@ -41,10 +40,6 @@ export default function Downloader({ handleRotate, flipFinished }) {
   const [downloadUrl, setDownloadUrl] = useState('');
   const [currentSong, setCurrentSong] = useState(null);
   const [, setErrorMessage] = useContext(ErrorContext);
-
-  useEffect(() => {
-    console.log(status.progress);
-  }, [status.progress]);
 
   useEffect(() => {
     let errorMessageTimeout;
@@ -73,6 +68,12 @@ export default function Downloader({ handleRotate, flipFinished }) {
     };
   }, [status.error, status.success]);
 
+  const cancelDownload = () => {
+    window.api.send('CANCEL_DOWNLOAD')
+    setCurrentSong(null);
+    dispatch({ type: 'CANCEL_DOWNLOAD' });
+  }
+
   const statusListener = () => {
     window.api.receive('STATUS', (newStatus) => {
       if (newStatus.progress && newStatus.progress < 100) {
@@ -100,6 +101,9 @@ export default function Downloader({ handleRotate, flipFinished }) {
       statusListener();
     } else {
       setErrorMessage('Invalid URL');
+      setTimeout(() => {
+        setErrorMessage('');
+      }, 500);
       dispatch({ type: 'DOWNLOAD_ERROR', payload: 'Invalid URL' });
     }
   };
@@ -125,16 +129,18 @@ export default function Downloader({ handleRotate, flipFinished }) {
             variant='outlined'
             size='small'
             error={status.error}
-            helperText={status.error ? status.errorMessage : '\u00A0'}
+            sx={{ marginBottom: '0.5rem' }}
             FormHelperTextProps={{ style: { minHeight: '1.8em' } }}
             onChange={(e) => setDownloadUrl(e.target.value)}
+            onClick={(e) => e.target.select()}
           />
           <DownloadButton
             status={status}
             dispatch={dispatch}
             handleDownload={handleDownload}
+            cancelDownload={cancelDownload}
           />
-          <div className='flex w-full mb-3 relative mt-2'>
+          <div className='flex w-full mb-2 relative mt-2 h-[20px]'>
             {status.downloading && (
               <>
                 <LinearProgress
@@ -154,7 +160,7 @@ export default function Downloader({ handleRotate, flipFinished }) {
   );
 }
 
-function DownloadButton({ status, dispatch, handleDownload }) {
+function DownloadButton({ status, handleDownload, cancelDownload }) {
   if (status.error || status.success) {
     return (
       <Button
@@ -171,7 +177,7 @@ function DownloadButton({ status, dispatch, handleDownload }) {
         variant='contained'
         color='primary'
         sx={{ width: '100%' }}
-        onClick={() => dispatch({ type: 'CANCEL_DOWNLOAD' })}
+        onClick={cancelDownload}
       >
         Cancel
       </Button>
