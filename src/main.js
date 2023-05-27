@@ -32,7 +32,6 @@ let mainWindow;
 const createWindow = () => {
   const bounds = getBounds();
   // Create the browser window.
-  console.log(bounds)
   mainWindow = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
